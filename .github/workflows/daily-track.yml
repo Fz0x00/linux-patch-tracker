@@ -43,8 +43,7 @@ jobs:
           python -m src.main \
             --config config.yaml \
             --output data \
-            ${{ inputs.skip_upstream == true && '--skip-upstream' || '' }} \
-            ${{ inputs.no_issues == true && '--no-issues' || '' }} \
+            --no-issues \
             --log-level INFO
 
       - name: Commit results
@@ -69,10 +68,13 @@ jobs:
         with:
           path: data
 
+  deploy:
+    needs: track
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
-        if: always()
         id: deployment
-        environment:
-          name: github-pages
-          url: ${{ steps.deployment.outputs.page_url }}
         uses: actions/deploy-pages@v4
