@@ -15,6 +15,7 @@
             --green: #3fb950;
             --yellow: #d29922;
             --red: #f85149;
+            --purple: #bc8cff;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -22,71 +23,206 @@
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
-            padding: 20px;
+            padding: 24px;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { font-size: 28px; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); margin-bottom: 24px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 26px; margin-bottom: 6px; }
+        .subtitle { color: var(--text-muted); margin-bottom: 28px; font-size: 14px; }
+
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 36px;
         }
         .stat-card {
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 20px;
+            padding: 16px;
         }
-        .stat-value { font-size: 32px; font-weight: 700; }
-        .stat-label { color: var(--text-muted); font-size: 14px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-label { color: var(--text-muted); font-size: 13px; }
         .stat-card.green .stat-value { color: var(--green); }
         .stat-card.yellow .stat-value { color: var(--yellow); }
         .stat-card.red .stat-value { color: var(--red); }
         .stat-card.blue .stat-value { color: var(--accent); }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        th, td {
-            padding: 10px 14px;
-            text-align: left;
+        .timeline-section { margin-bottom: 48px; }
+        .cve-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
-            font-size: 13px;
         }
-        th {
-            background: #21262d;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            white-space: nowrap;
+        .cve-id {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
         }
-        tr:hover { background: #1c2128; }
-        .badge {
+        .cve-severity {
             display: inline-block;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
         }
-        .badge-fixed { background: rgba(63,185,80,0.15); color: var(--green); }
-        .badge-pending { background: rgba(210,153,34,0.15); color: var(--yellow); }
-        .badge-na { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-        .badge-unknown { background: rgba(248,81,73,0.15); color: var(--red); }
-        .delay-fast { color: var(--green); font-weight: 600; }
-        .delay-slow { color: var(--red); font-weight: 600; }
-        .delay-ok { color: var(--text-muted); }
-        a { color: var(--accent); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .section { margin-bottom: 32px; }
-        .section-title { font-size: 20px; margin-bottom: 12px; }
-        .generated { color: var(--text-muted); font-size: 12px; margin-top: 40px; }
+        .sev-high { background: rgba(248,81,73,0.15); color: var(--red); }
+        .sev-critical { background: rgba(248,81,73,0.25); color: #ff7b72; }
+        .cve-desc { color: var(--text-muted); font-size: 13px; }
+
+        .tl-container {
+            position: relative;
+            padding-left: 32px;
+        }
+        .tl-container::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .tl-item {
+            position: relative;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .tl-dot {
+            position: absolute;
+            left: -32px;
+            top: 4px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            z-index: 1;
+        }
+        .tl-dot.upstream {
+            background: var(--accent);
+            color: #fff;
+        }
+        .tl-dot.fixed {
+            background: var(--green);
+            color: #fff;
+        }
+        .tl-dot.pending {
+            background: var(--yellow);
+            color: #000;
+        }
+        .tl-dot.na {
+            background: var(--text-muted);
+            color: #fff;
+        }
+
+        .tl-content {
+            flex: 1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 18px;
+        }
+        .tl-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tl-distros {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .tl-distro {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #21262d;
+            border: 1px solid var(--border);
+        }
+        .tl-distro .name { font-weight: 600; }
+        .tl-distro .delta { font-weight: 700; font-size: 11px; }
+        .tl-distro.fast .delta { color: var(--green); }
+        .tl-distro.ok .delta { color: var(--text-muted); }
+        .tl-distro.slow .delta { color: var(--yellow); }
+        .tl-distro.critical .delta { color: var(--red); }
+        .tl-distro.pending-d .delta { color: var(--yellow); font-style: italic; }
+
+        .tl-bar-container {
+            margin-top: 10px;
+            height: 6px;
+            background: #21262d;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .tl-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .tl-bar.fast { background: var(--green); }
+        .tl-bar.ok { background: var(--text-muted); }
+        .tl-bar.slow { background: var(--yellow); }
+        .tl-bar.critical { background: var(--red); }
+
+        .tl-date {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+
+        .generated {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .tl-row { flex-direction: column; align-items: flex-start; }
+            .tl-distro { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
@@ -94,43 +230,141 @@
     <h1>Linux 内核补丁时效追踪</h1>
     <p class="subtitle">监控主流公有云 Linux 发行版对上游 kernel.org 漏洞修复的响应速度</p>
 
-    <div class="stats">
-        <div class="stat-card blue">
-            <div class="stat-value">0</div>
-            <div class="stat-label">追踪 CVE</div>
-        </div>
-        <div class="stat-card green">
-            <div class="stat-value">0</div>
-            <div class="stat-label">已修复</div>
-        </div>
-        <div class="stat-card yellow">
-            <div class="stat-value">0</div>
-            <div class="stat-label">待修复</div>
-        </div>
-        <div class="stat-card red">
-            <div class="stat-value">0</div>
-            <div class="stat-label">严重延迟 (>30d)</div>
-        </div>
+    <div class="stats" id="stats">
+        <div class="stat-card blue"><div class="stat-value" id="s-total">0</div><div class="stat-label">追踪 CVE</div></div>
+        <div class="stat-card green"><div class="stat-value" id="s-fixed">0</div><div class="stat-label">已修复</div></div>
+        <div class="stat-card yellow"><div class="stat-value" id="s-pending">0</div><div class="stat-label">待修复</div></div>
+        <div class="stat-card red"><div class="stat-value" id="s-critical">0</div><div class="stat-label">严重延迟 (>30d)</div></div>
     </div>
 
-    <div class="section">
-        <h2 class="section-title">补丁延迟矩阵</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>CVE</th>
-                    
-                </tr>
-            </thead>
-            <tbody>
-                
-            </tbody>
-        </table>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>上游修复</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>≤7d 快速</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--text-muted)"></div>8~14d 正常</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>15~30d 偏慢</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>>30d 严重</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>待修复</div>
     </div>
 
-    
+    <div id="timelines"></div>
 
-    <p class="generated">Generated at 2026-07-01 14:21 UTC by linux-kernel-patch-tracker</p>
+    <p class="generated" id="generated"></p>
 </div>
+
+<script>
+// DATA_PLACEHOLDER will be replaced by the workflow
+const DATA = /*DATA_PLACEHOLDER*/{
+    "generated_at": "",
+    "cves": [],
+    "records": []
+}/*END_DATA_PLACEHOLDER*/;
+
+function classify(delta) {
+    if (delta === null || delta === undefined) return 'pending-d';
+    if (delta <= 7) return 'fast';
+    if (delta <= 14) return 'ok';
+    if (delta <= 30) return 'slow';
+    return 'critical';
+}
+
+function barWidth(delta) {
+    if (delta === null || delta === undefined) return 0;
+    return Math.min(Math.max((delta / 45) * 100, 2), 100);
+}
+
+function render() {
+    const { generated_at, cves, records } = DATA;
+    if (!cves.length) {
+        document.getElementById('timelines').innerHTML = `
+            <div class="empty-state">
+                <h3>暂无数据</h3>
+                <p>等待 GitHub Actions 首次运行后自动填充</p>
+            </div>`;
+        document.getElementById('generated').textContent = generated_at ? `Generated at ${generated_at}` : '';
+        return;
+    }
+
+    // Stats
+    const total = cves.length;
+    const fixedCount = records.filter(r => r.status === 'fixed').length;
+    const pendingCount = records.filter(r => r.status === 'pending').length;
+    const criticalCount = records.filter(r => r.alert_level === 'critical').length;
+    document.getElementById('s-total').textContent = total;
+    document.getElementById('s-fixed').textContent = fixedCount;
+    document.getElementById('s-pending').textContent = pendingCount;
+    document.getElementById('s-critical').textContent = criticalCount;
+    document.getElementById('generated').textContent = `Generated at ${generated_at}`;
+
+    // Group records by CVE
+    const byCve = {};
+    for (const r of records) {
+        (byCve[r.cve_id] = byCve[r.cve_id] || []).push(r);
+    }
+
+    let html = '';
+    for (const cve of cves) {
+        const recs = byCve[cve.cve_id] || [];
+        const sevClass = cve.severity === 'Critical' ? 'sev-critical' : 'sev-high';
+
+        html += `<div class="timeline-section">
+            <div class="cve-header">
+                <span class="cve-id">${cve.cve_id}</span>
+                <span class="cve-severity ${sevClass}">${cve.severity} ${cve.cvss_score}</span>
+                <span class="cve-desc">${cve.description}</span>
+            </div>
+            <div class="tl-container">
+                <div class="tl-item">
+                    <div class="tl-dot upstream">U</div>
+                    <div class="tl-content">
+                        <div class="tl-row">
+                            <div><strong>上游 kernel.org</strong> &mdash; ${cve.upstream_version || '?'}</div>
+                            <div class="tl-date">${cve.upstream_fix_date || 'unknown'}</div>
+                        </div>
+                    </div>
+                </div>`;
+
+        // Sort: fixed first (by delta asc), then pending
+        const sorted = [...recs].sort((a, b) => {
+            if (a.status === 'fixed' && b.status !== 'fixed') return -1;
+            if (a.status !== 'fixed' && b.status === 'fixed') return 1;
+            return (a.delay_days || 999) - (b.delay_days || 999);
+        });
+
+        for (const r of sorted) {
+            const cls = r.status === 'pending' ? 'pending' : classify(r.delay_days);
+            const dotLabel = r.status === 'pending' ? '!' : (r.delay_days <= 0 ? 'F' : r.delay_days);
+            const deltaText = r.status === 'pending'
+                ? `pending ${r.delay_days !== null ? '+' + r.delay_days + 'd' : ''}`
+                : (r.delay_days <= 0 ? `${r.delay_days}d (fast)` : `+${r.delay_days}d`);
+
+            html += `
+                <div class="tl-item">
+                    <div class="tl-dot ${cls === 'pending-d' ? 'pending' : cls}">${typeof dotLabel === 'number' && dotLabel < 10 ? dotLabel : dotLabel.toString().slice(0,2)}</div>
+                    <div class="tl-content">
+                        <div class="tl-row">
+                            <div>
+                                <span class="tl-distro ${cls}">
+                                    <span class="name">${r.distro_name}</span>
+                                    <span class="delta">${deltaText}</span>
+                                </span>
+                                ${r.advisory_id ? `<span style="font-size:11px;color:var(--text-muted);margin-left:6px">${r.advisory_id}</span>` : ''}
+                            </div>
+                            <div class="tl-date">${r.fix_date || '—'}</div>
+                        </div>
+                        <div class="tl-bar-container">
+                            <div class="tl-bar ${cls}" style="width:${barWidth(r.delay_days)}%"></div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        html += `</div></div>`;
+    }
+
+    document.getElementById('timelines').innerHTML = html;
+}
+
+render();
+</script>
 </body>
 </html>

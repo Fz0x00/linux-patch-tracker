@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
-import os
 from datetime import datetime
 from typing import Optional
 
-from jinja2 import Template
 from .models import LatencyRecord, CVERecord, DistroStatus, AlertLevel
 
 logger = logging.getLogger(__name__)
 
-DASHBOARD_TEMPLATE = """<!DOCTYPE html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -36,71 +35,170 @@ DASHBOARD_TEMPLATE = """<!DOCTYPE html>
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
-            padding: 20px;
+            padding: 24px;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
-        h1 { font-size: 28px; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); margin-bottom: 24px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 26px; margin-bottom: 6px; }
+        .subtitle { color: var(--text-muted); margin-bottom: 28px; font-size: 14px; }
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 36px;
         }
         .stat-card {
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 20px;
+            padding: 16px;
         }
-        .stat-value { font-size: 32px; font-weight: 700; }
-        .stat-label { color: var(--text-muted); font-size: 14px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-label { color: var(--text-muted); font-size: 13px; }
         .stat-card.green .stat-value { color: var(--green); }
         .stat-card.yellow .stat-value { color: var(--yellow); }
         .stat-card.red .stat-value { color: var(--red); }
         .stat-card.blue .stat-value { color: var(--accent); }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            overflow: hidden;
+        .legend {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
         }
-        th, td {
-            padding: 10px 14px;
-            text-align: left;
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .timeline-section { margin-bottom: 48px; }
+        .cve-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
-            font-size: 13px;
+            flex-wrap: wrap;
         }
-        th {
-            background: #21262d;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            white-space: nowrap;
-        }
-        tr:hover { background: #1c2128; }
-        .badge {
+        .cve-id { font-size: 18px; font-weight: 700; color: var(--accent); }
+        .cve-severity {
             display: inline-block;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
         }
-        .badge-fixed { background: rgba(63,185,80,0.15); color: var(--green); }
-        .badge-pending { background: rgba(210,153,34,0.15); color: var(--yellow); }
-        .badge-na { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-        .badge-unknown { background: rgba(248,81,73,0.15); color: var(--red); }
-        .delay-fast { color: var(--green); font-weight: 600; }
-        .delay-slow { color: var(--red); font-weight: 600; }
-        .delay-ok { color: var(--text-muted); }
-        a { color: var(--accent); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .section { margin-bottom: 32px; }
-        .section-title { font-size: 20px; margin-bottom: 12px; }
-        .generated { color: var(--text-muted); font-size: 12px; margin-top: 40px; }
+        .sev-high { background: rgba(248,81,73,0.15); color: var(--red); }
+        .sev-critical { background: rgba(248,81,73,0.25); color: #ff7b72; }
+        .cve-desc { color: var(--text-muted); font-size: 13px; }
+        .tl-container {
+            position: relative;
+            padding-left: 32px;
+        }
+        .tl-container::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+        .tl-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .tl-dot {
+            position: absolute;
+            left: -32px;
+            top: 14px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            z-index: 1;
+        }
+        .tl-dot.upstream { background: var(--accent); color: #fff; }
+        .tl-dot.fast { background: var(--green); color: #fff; }
+        .tl-dot.ok { background: var(--text-muted); color: #fff; }
+        .tl-dot.slow { background: var(--yellow); color: #000; }
+        .tl-dot.critical { background: var(--red); color: #fff; }
+        .tl-dot.pending { background: var(--yellow); color: #000; }
+        .tl-content {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 18px;
+        }
+        .tl-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tl-distro-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #21262d;
+            border: 1px solid var(--border);
+        }
+        .tl-distro-tag .name { font-weight: 600; }
+        .tl-distro-tag .delta { font-weight: 700; font-size: 11px; }
+        .tl-distro-tag.fast .delta { color: var(--green); }
+        .tl-distro-tag.ok .delta { color: var(--text-muted); }
+        .tl-distro-tag.slow .delta { color: var(--yellow); }
+        .tl-distro-tag.critical .delta { color: var(--red); }
+        .tl-distro-tag.pending .delta { color: var(--yellow); font-style: italic; }
+        .tl-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .tl-bar-wrap {
+            margin-top: 10px;
+            height: 6px;
+            background: #21262d;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .tl-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .tl-bar.fast { background: var(--green); }
+        .tl-bar.ok { background: var(--text-muted); }
+        .tl-bar.slow { background: var(--yellow); }
+        .tl-bar.critical { background: var(--red); }
+        .tl-bar.pending { background: var(--yellow); }
+        .advisory-id { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+        .generated {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 40px;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            .tl-row { flex-direction: column; align-items: flex-start; }
+            .tl-distro-tag { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
@@ -109,95 +207,61 @@ DASHBOARD_TEMPLATE = """<!DOCTYPE html>
     <p class="subtitle">监控主流公有云 Linux 发行版对上游 kernel.org 漏洞修复的响应速度</p>
 
     <div class="stats">
-        <div class="stat-card blue">
-            <div class="stat-value">{{ total_cves }}</div>
-            <div class="stat-label">追踪 CVE</div>
-        </div>
-        <div class="stat-card green">
-            <div class="stat-value">{{ fixed_count }}</div>
-            <div class="stat-label">已修复</div>
-        </div>
-        <div class="stat-card yellow">
-            <div class="stat-value">{{ pending_count }}</div>
-            <div class="stat-label">待修复</div>
-        </div>
-        <div class="stat-card red">
-            <div class="stat-value">{{ critical_count }}</div>
-            <div class="stat-label">严重延迟 (>30d)</div>
-        </div>
+        <div class="stat-card blue"><div class="stat-value">{{ total_cves }}</div><div class="stat-label">追踪 CVE</div></div>
+        <div class="stat-card green"><div class="stat-value">{{ fixed_count }}</div><div class="stat-label">已修复</div></div>
+        <div class="stat-card yellow"><div class="stat-value">{{ pending_count }}</div><div class="stat-label">待修复</div></div>
+        <div class="stat-card red"><div class="stat-value">{{ critical_count }}</div><div class="stat-label">严重延迟 (>30d)</div></div>
     </div>
 
-    <div class="section">
-        <h2 class="section-title">补丁延迟矩阵</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>CVE</th>
-                    {% for d in distros %}
-                    <th>{{ d }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for cve_id, rows in matrix.items() %}
-                <tr>
-                    <td><strong>{{ cve_id }}</strong></td>
-                    {% for d in distros %}
-                    {% set r = rows.get(d) %}
-                    {% if r %}
-                        <td>
-                            {% if r.status == 'not_affected' %}
-                                <span class="badge badge-na">N/A</span>
-                            {% elif r.status == 'pending' %}
-                                <span class="badge badge-pending">pending</span>
-                                {% if r.delay_days %}<br><span class="delay-slow">{{ r.delay_days }}d</span>{% endif %}
-                            {% elif r.status == 'fixed' %}
-                                {% if r.delay_days is not none %}
-                                    {% if r.delay_days < 0 %}
-                                        <span class="delay-fast">{{ r.delay_days }}d</span>
-                                    {% elif r.delay_days > 30 %}
-                                        <span class="delay-slow">+{{ r.delay_days }}d</span>
-                                    {% else %}
-                                        <span class="delay-ok">+{{ r.delay_days }}d</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="badge badge-fixed">fixed</span>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge badge-unknown">?</span>
-                            {% endif %}
-                        </td>
-                    {% else %}
-                        <td>—</td>
-                    {% endif %}
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>上游修复</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>≤7d 快速</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--text-muted)"></div>8~14d 正常</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>15~30d 偏慢</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>>30d 严重</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>待修复</div>
     </div>
 
-    {% if slowest %}
-    <div class="section">
-        <h2 class="section-title">最慢响应 TOP 10</h2>
-        <table>
-            <thead>
-                <tr><th>CVE</th><th>发行版</th><th>延迟</th><th>状态</th><th>链接</th></tr>
-            </thead>
-            <tbody>
-                {% for r in slowest %}
-                <tr>
-                    <td>{{ r.cve_id }}</td>
-                    <td>{{ r.distro_name }}</td>
-                    <td class="delay-slow">+{{ r.delay_days }}d</td>
-                    <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
-                    <td>{% if r.advisory_url %}<a href="{{ r.advisory_url }}">advisory</a>{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% for cve in cve_list %}
+    <div class="timeline-section">
+        <div class="cve-header">
+            <span class="cve-id">{{ cve.cve_id }}</span>
+            <span class="cve-severity {% if cve.severity == 'Critical' %}sev-critical{% else %}sev-high{% endif %}">{{ cve.severity }} {{ cve.cvss_score }}</span>
+            <span class="cve-desc">{{ cve.description }}</span>
+        </div>
+        <div class="tl-container">
+            <div class="tl-item">
+                <div class="tl-dot upstream">U</div>
+                <div class="tl-content">
+                    <div class="tl-row">
+                        <div><strong>上游 kernel.org</strong> &mdash; {{ cve.upstream_version or '?' }}</div>
+                        <div class="tl-date">{{ cve.upstream_fix_date or 'unknown' }}</div>
+                    </div>
+                </div>
+            </div>
+            {% for r in cve.records %}
+            <div class="tl-item">
+                <div class="tl-dot {{ r.tl_cls }}">{{ r.dot_label }}</div>
+                <div class="tl-content">
+                    <div class="tl-row">
+                        <div>
+                            <span class="tl-distro-tag {{ r.tl_cls }}">
+                                <span class="name">{{ r.distro_name }}</span>
+                                <span class="delta">{{ r.delta_text }}</span>
+                            </span>
+                            {% if r.advisory_id %}<span class="advisory-id">{{ r.advisory_id }}</span>{% endif %}
+                        </div>
+                        <div class="tl-date">{{ r.fix_date or '—' }}</div>
+                    </div>
+                    <div class="tl-bar-wrap">
+                        <div class="tl-bar {{ r.tl_cls }}" style="width:{{ r.bar_width }}%"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
-    {% endif %}
+    {% endfor %}
 
     <p class="generated">Generated at {{ generated_at }} by linux-kernel-patch-tracker</p>
 </div>
@@ -205,37 +269,93 @@ DASHBOARD_TEMPLATE = """<!DOCTYPE html>
 </html>"""
 
 
+def _classify(delta: int | None) -> str:
+    if delta is None:
+        return "pending"
+    if delta <= 7:
+        return "fast"
+    if delta <= 14:
+        return "ok"
+    if delta <= 30:
+        return "slow"
+    return "critical"
+
+
+def _bar_width(delta: int | None) -> int:
+    if delta is None:
+        return 0
+    return min(max(int((delta / 45) * 100), 2), 100)
+
+
 def generate_dashboard_html(
     records: list[LatencyRecord],
     cves: list[CVERecord],
     generated_at: Optional[datetime] = None,
 ) -> str:
-    """Generate HTML dashboard for GitHub Pages."""
+    """Generate timeline-style HTML dashboard for GitHub Pages."""
     if generated_at is None:
         generated_at = datetime.utcnow()
 
-    distro_names = sorted(set(r.distro_name for r in records))
-    cve_ids = sorted(set(r.cve_id for r in records))
+    from jinja2 import Template
 
-    matrix = {}
-    for cve_id in cve_ids:
-        matrix[cve_id] = {}
-        for d in distro_names:
-            matching = [r for r in records if r.cve_id == cve_id and r.distro_name == d]
-            if matching:
-                r = matching[0]
-                matrix[cve_id][d] = {
-                    "status": r.status.value,
-                    "delay_days": r.delay_days,
-                }
+    # Group records by CVE
+    by_cve: dict[str, list[LatencyRecord]] = {}
+    for r in records:
+        by_cve.setdefault(r.cve_id, []).append(r)
+
+    cve_list = []
+    for cve in cves:
+        recs = by_cve.get(cve.cve_id, [])
+        # Sort: fixed first (by delta asc), then pending
+        sorted_recs = sorted(
+            recs,
+            key=lambda r: (
+                0 if r.status == DistroStatus.FIXED else 1,
+                r.delay_days if r.delay_days is not None else 999,
+            ),
+        )
+        enriched = []
+        for r in sorted_recs:
+            cls = "pending" if r.status == DistroStatus.PENDING else _classify(r.delay_days)
+            if r.status == DistroStatus.NOT_AFFECTED:
+                cls = "ok"
+            if r.status == DistroStatus.UNKNOWN:
+                cls = "critical"
+
+            if r.status == DistroStatus.PENDING:
+                dot = "!"
+                delta_text = f"pending {'+' + str(r.delay_days) + 'd' if r.delay_days else ''}"
+            elif r.delay_days is not None and r.delay_days <= 0:
+                dot = str(r.delay_days)
+                delta_text = f"{r.delay_days}d (fast)"
+            elif r.delay_days is not None:
+                dot = str(r.delay_days) if r.delay_days < 10 else "+" + str(r.delay_days)
+                delta_text = f"+{r.delay_days}d"
             else:
-                matrix[cve_id][d] = None
+                dot = "?"
+                delta_text = r.status.value
 
-    slowest = sorted(
-        [r for r in records if r.delay_days is not None and r.delay_days > 0],
-        key=lambda r: r.delay_days,
-        reverse=True,
-    )[:10]
+            enriched.append({
+                "distro_name": r.distro_name,
+                "status": r.status.value,
+                "delay_days": r.delay_days,
+                "fix_date": r.fix_date.strftime("%Y-%m-%d") if r.fix_date else None,
+                "advisory_id": r.advisory_id or "",
+                "tl_cls": cls,
+                "dot_label": dot,
+                "delta_text": delta_text,
+                "bar_width": _bar_width(r.delay_days),
+            })
+
+        cve_list.append({
+            "cve_id": cve.cve_id,
+            "severity": cve.severity,
+            "cvss_score": cve.cvss_score,
+            "description": cve.description,
+            "upstream_version": cve.upstream_version,
+            "upstream_fix_date": cve.upstream_fix_date.strftime("%Y-%m-%d") if cve.upstream_fix_date else None,
+            "records": enriched,
+        })
 
     fixed_count = sum(1 for r in records if r.status == DistroStatus.FIXED)
     pending_count = sum(1 for r in records if r.status == DistroStatus.PENDING)
@@ -243,23 +363,12 @@ def generate_dashboard_html(
         1 for r in records if r.delay_days is not None and r.delay_days > 30
     )
 
-    template = Template(DASHBOARD_TEMPLATE)
+    template = Template(DASHBOARD_HTML)
     return template.render(
-        total_cves=len(cve_ids),
+        total_cves=len(cves),
         fixed_count=fixed_count,
         pending_count=pending_count,
         critical_count=critical_count,
-        distros=distro_names,
-        matrix=matrix,
-        slowest=[
-            {
-                "cve_id": r.cve_id,
-                "distro_name": r.distro_name,
-                "delay_days": r.delay_days,
-                "status": r.status.value,
-                "advisory_url": r.advisory_url,
-            }
-            for r in slowest
-        ],
+        cve_list=cve_list,
         generated_at=generated_at.strftime("%Y-%m-%d %H:%M UTC"),
     )
