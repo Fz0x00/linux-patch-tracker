@@ -40,8 +40,12 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def collect_cves(config: dict) -> set[str]:
-    """Collect CVE IDs from all enabled distro sources."""
+def collect_cves(config: dict) -> list[str]:
+    """Collect CVE IDs from all enabled distro sources.
+
+    Returns sorted list, limited to MAX_CVES to avoid excessive API calls.
+    """
+    MAX_CVES = 100
     lookback = config["settings"].get("lookback_days", 30)
     all_cves = set()
 
@@ -63,11 +67,14 @@ def collect_cves(config: dict) -> set[str]:
         except Exception as e:
             logger.error("%s: fetch failed: %s", distro["name"], e)
 
-    return all_cves
+    # Sort by CVE ID descending (newest first) and limit
+    sorted_cves = sorted(all_cves, reverse=True)[:MAX_CVES]
+    logger.info("Total unique kernel CVEs: %d (limited to %d)", len(all_cves), len(sorted_cves))
+    return sorted_cves
 
 
 def collect_advisories(
-    cves: set[str], config: dict
+    cve_ids: list[str], config: dict
 ) -> tuple[list[CVERecord], dict[str, list[DistroAdvisory]]]:
     """Collect advisories from all enabled distros for each CVE."""
     advisories: dict[str, list[DistroAdvisory]] = {}
@@ -84,7 +91,7 @@ def collect_advisories(
 
         fetcher = fetcher_cls(distro["name"], distro.get("params", {}))
 
-        for cve_id in sorted(cves):
+        for cve_id in cve_ids:
             try:
                 adv = fetcher.get_advisory(cve_id)
                 if adv:
