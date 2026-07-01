@@ -1,4 +1,4 @@
-"""Main entry point for the kernel patch tracker."""
+"""Main entry point for the kernel patch latency tracker."""
 
 from __future__ import annotations
 
@@ -6,21 +6,18 @@ import argparse
 import json
 import logging
 import os
-import sys
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 
 from .models import CVERecord, DistroAdvisory, DistroStatus, LatencyRecord
-from .cache import get_db, fetch_and_cache, lookup_cve, get_stats
 from .sources.rhel import RHELFetcher
 from .sources.aws import AWSFetcher
 from .sources.ubuntu import UbuntuFetcher
 from .sources.aliyun import AliyunFetcher
 from .sources.oracle import OracleFetcher
 from .sources.debian import DebianFetcher
-from .sources.azure import AzureFetcher
 from .analyzer import LatencyAnalyzer
 from .report import generate_csv, generate_markdown_report
 from .pages import generate_dashboard_html
@@ -35,7 +32,6 @@ FETCHER_MAP = {
     "aliyun": AliyunFetcher,
     "oracle": OracleFetcher,
     "debian": DebianFetcher,
-    "azure": AzureFetcher,
 }
 
 
@@ -54,9 +50,6 @@ def collect_cves(config: dict) -> set[str]:
             continue
 
         fetcher_name = distro["fetcher"]
-        if fetcher_name == "azure":
-            continue
-
         fetcher_cls = FETCHER_MAP.get(fetcher_name)
         if not fetcher_cls:
             logger.warning("Unknown fetcher: %s", fetcher_name)
@@ -73,44 +66,12 @@ def collect_cves(config: dict) -> set[str]:
     return all_cves
 
 
-def ensure_changelog_cache(config: dict, db) -> None:
-    """Fetch upstream CVE info from NVD and cache in SQLite.
-
-    Only queries CVEs not already in the DB.
-    """
-    # Just log stats
-    stats = get_stats(db)
-    logger.info("Cache stats: %d CVEs already cached", stats["total_cached"])
-
-
-def resolve_upstream(cve_ids: set[str], db) -> list[CVERecord]:
-    """Resolve upstream fix dates from local SQLite cache."""
-    cves = []
-    for cve_id in sorted(cve_ids):
-        result = lookup_cve(db, cve_id)
-        fix_date = None
-        version = ""
-        if result:
-            fix_date = result["published_date"]
-            version = result["fix_version"]
-        cves.append(CVERecord(
-            cve_id=cve_id,
-            upstream_version=version,
-            upstream_fix_date=fix_date,
-        ))
-        if fix_date:
-            logger.info("%s: upstream fix=%s %s", cve_id, fix_date, version)
-        else:
-            logger.info("%s: upstream fix=unknown", cve_id)
-
-    return cves
-
-
 def collect_advisories(
-    cves: list[CVERecord], config: dict
-) -> dict[str, list[DistroAdvisory]]:
+    cves: set[str], config: dict
+) -> tuple[list[CVERecord], dict[str, list[DistroAdvisory]]]:
     """Collect advisories from all enabled distros for each CVE."""
     advisories: dict[str, list[DistroAdvisory]] = {}
+    cve_record_map: dict[str, CVERecord] = {}
 
     for distro in config.get("distros", []):
         if not distro.get("enabled", True):
@@ -123,45 +84,32 @@ def collect_advisories(
 
         fetcher = fetcher_cls(distro["name"], distro.get("params", {}))
 
-        if fetcher_name == "azure":
-            for cve in cves:
-                info = fetcher.get_latest_kernel_info()
-                adv = DistroAdvisory(
-                    distro_name=distro["name"],
-                    cve_id=cve.cve_id,
-                    status=DistroStatus.UNKNOWN,
-                    source_url=fetcher.repo_url,
-                )
-                if info:
-                    adv.kernel_version = info.get("version", "")
-                    adv.fix_date = info.get("build_date")
-                advisories.setdefault(cve.cve_id, []).append(adv)
-            continue
-
-        for cve in cves:
+        for cve_id in sorted(cves):
             try:
-                adv = fetcher.get_advisory(cve.cve_id)
+                adv = fetcher.get_advisory(cve_id)
                 if adv:
-                    advisories.setdefault(cve.cve_id, []).append(adv)
+                    advisories.setdefault(cve_id, []).append(adv)
                     logger.info(
                         "%s → %s: %s %s",
-                        cve.cve_id,
+                        cve_id,
                         distro["name"],
                         adv.status.value,
                         adv.fix_date or "",
                     )
             except Exception as e:
-                logger.error("%s on %s: %s", cve.cve_id, distro["name"], e)
+                logger.error("%s on %s: %s", cve_id, distro["name"], e)
 
-    return advisories
+    # Build CVERecord list from advisories (only CVEs that have at least one distro entry)
+    for cve_id in sorted(advisories.keys()):
+        cve_record_map[cve_id] = CVERecord(cve_id=cve_id)
+
+    return list(cve_record_map.values()), advisories
 
 
 def main():
     parser = argparse.ArgumentParser(description="Linux kernel patch latency tracker")
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
     parser.add_argument("--output", default="data", help="Output directory")
-    parser.add_argument("--skip-upstream", action="store_true", help="Skip upstream resolution (use cached CVEs)")
-    parser.add_argument("--skip-changelog", action="store_true", help="Skip ChangeLog download (use existing DB)")
     parser.add_argument("--no-issues", action="store_true", help="Skip GitHub issue creation")
     parser.add_argument(
         "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -177,39 +125,21 @@ def main():
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Open SQLite cache
-    db = get_db(output_dir / "kernel_cves.db")
-
     logger.info("=== Step 1: Collecting CVEs ===")
     cve_ids = collect_cves(config)
     logger.info("Total unique kernel CVEs: %d", len(cve_ids))
 
-    if not args.skip_changelog:
-        logger.info("=== Step 2: Updating upstream cache ===")
-        fetch_and_cache(cve_ids, db)
+    logger.info("=== Step 2: Collecting advisories ===")
+    cves, advisories = collect_advisories(cve_ids, config)
+    logger.info("CVEs with distro data: %d", len(cves))
 
-    if args.skip_upstream and (output_dir / "cves.json").exists():
-        logger.info("Loading cached CVE records")
-        with open(output_dir / "cves.json") as f:
-            cve_data = json.load(f)
-        cves = [CVERecord(**c) for c in cve_data]
-    else:
-        logger.info("=== Step 3: Resolving upstream fix dates from DB ===")
-        cves = resolve_upstream(cve_ids, db)
-        cve_dicts = [c.to_dict() for c in cves]
-        with open(output_dir / "cves.json", "w") as f:
-            json.dump(cve_dicts, f, indent=2, ensure_ascii=False)
-
-    logger.info("=== Step 4: Collecting advisories ===")
-    advisories = collect_advisories(cves, config)
-
-    logger.info("=== Step 5: Computing latency ===")
+    logger.info("=== Step 3: Computing latency ===")
     warning_threshold = config["settings"].get("alert_thresholds", {}).get("warning", 14)
     critical_threshold = config["settings"].get("alert_thresholds", {}).get("critical", 30)
     analyzer = LatencyAnalyzer(warning_threshold, critical_threshold)
     records = analyzer.compute_all(cves, advisories)
 
-    logger.info("=== Step 6: Generating reports ===")
+    logger.info("=== Step 4: Generating reports ===")
     csv_data = generate_csv(records)
     with open(output_dir / "latency.csv", "w") as f:
         f.write(csv_data)
@@ -227,7 +157,7 @@ def main():
     logger.info("Dashboard written to %s", dashboard_path)
 
     if not args.no_issues:
-        logger.info("=== Step 7: Managing GitHub Issues ===")
+        logger.info("=== Step 5: Managing GitHub Issues ===")
         github_repo = os.environ.get("GITHUB_REPOSITORY")
         close_resolved_issues(records, github_repo)
 
@@ -235,7 +165,6 @@ def main():
             if should_create_issue(record, set()):
                 create_github_issue(record, github_repo)
 
-    db.close()
     logger.info("=== Done ===")
 
 
