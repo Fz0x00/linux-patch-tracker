@@ -1,4 +1,4 @@
-# linux-kernel-patch-tracker
+# linux-patch-tracker
 
 自动追踪主流公有云 Linux 发行版对上游 kernel.org 漏洞修复的响应速度。
 
@@ -13,7 +13,6 @@
 | **Aliyun 2** | `mirrors.aliyun.com/alinux/cve/` | XML + RSS |
 | **Oracle UEKR8** | `oss.oracle.com/pipermail/el-errata/` | 邮件列表 |
 | **Debian trixie** | `security-tracker.debian.org` | HTML |
-| **Azure Linux 3.0/4.0** | `packages.microsoft.com` RPM repo | repodata 推断 |
 
 ## 工作流
 
@@ -34,7 +33,6 @@ kernel.org ChangeLog → 提取 CVE + 上游修复日
 ## 本地运行
 
 ```bash
-# 安装依赖
 cd tracker
 pip install -r requirements.txt
 
@@ -80,8 +78,7 @@ settings:
 
 | 文件 | 说明 |
 |---|---|
-| `data/cves.json` | 所有追踪的 CVE 记录（含上游信息） |
-| `data/latency.csv` | 延迟矩阵 CSV（机器可读） |
+| `data/latency.csv` | 延迟矩阵 CSV |
 | `data/report.md` | Markdown 格式的完整报告 |
 | `data/index.html` | GitHub Pages 仪表板 |
 
@@ -103,8 +100,7 @@ src/
     ├── ubuntu.py      # Ubuntu CVE + USN
     ├── aliyun.py      # Aliyun XML + RSS
     ├── oracle.py      # Oracle el-errata 邮件列表
-    ├── debian.py      # Debian security tracker
-    └── azure.py       # Azure Linux RPM 仓库元数据
+    └── debian.py      # Debian security tracker
 ```
 
 ## 扩展新数据源
