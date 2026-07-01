@@ -2,7 +2,6 @@ name: Daily Patch Tracking
 
 on:
   schedule:
-    # Run daily at 06:00 UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -35,12 +34,9 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        working-directory: tracker
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run tracker
-        working-directory: tracker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -55,11 +51,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Add generated data
-          git add tracker/data/*.json tracker/data/*.csv tracker/data/*.md || true
-
-          # Only commit if there are changes
+          git add data/*.json data/*.csv data/*.md || true
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
@@ -75,7 +67,7 @@ jobs:
         if: always()
         uses: actions/upload-pages-artifact@v3
         with:
-          path: tracker/data
+          path: data
 
       - name: Deploy to GitHub Pages
         if: always()
