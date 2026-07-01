@@ -1,0 +1,110 @@
+# Tracking configuration
+# Distributions to monitor and their data sources
+
+settings:
+  # Only track CVEs from the kernel package
+  kernel_only: true
+  # Lookback period in days for new CVEs
+  lookback_days: 30
+  # Minimum CVSS score to track (0 = all)
+  min_cvss: 5.0
+  # Alert thresholds (in days) - create GitHub Issue when delay exceeds
+  alert_thresholds:
+    warning: 14    # > 14 days = warning
+    critical: 30   # > 30 days = critical
+
+# Upstream baseline
+kernel_org:
+  stable_branches:
+    - major: "7.0"
+      series: "v7.x"
+    - major: "6.12"
+      series: "v6.x"
+    - major: "6.6"
+      series: "v6.x"
+  base_url: "https://cdn.kernel.org/pub/linux/kernel"
+
+# Distribution sources
+distros:
+  - name: "rhel-10"
+    enabled: true
+    fetcher: "rhel"
+    params:
+      product_filter: "Red Hat Enterprise Linux 10"
+      api_url: "https://access.redhat.com/hydra/rest/securitydata"
+
+  - name: "rhel-9"
+    enabled: true
+    fetcher: "rhel"
+    params:
+      product_filter: "Red Hat Enterprise Linux 9"
+      api_url: "https://access.redhat.com/hydra/rest/securitydata"
+
+  - name: "rhel-8"
+    enabled: true
+    fetcher: "rhel"
+    params:
+      product_filter: "Red Hat Enterprise Linux 8"
+      api_url: "https://access.redhat.com/hydra/rest/securitydata"
+
+  - name: "aws-al2"
+    enabled: true
+    fetcher: "aws"
+    params:
+      explore_url: "https://explore.alas.aws.amazon.com"
+      alas_base: "https://alas.aws.amazon.com/AL2"
+
+  - name: "aws-al2023"
+    enabled: true
+    fetcher: "aws"
+    params:
+      explore_url: "https://explore.alas.aws.amazon.com"
+      alas_base: "https://alas.aws.amazon.com/AL2023"
+
+  - name: "ubuntu-24.04"
+    enabled: true
+    fetcher: "ubuntu"
+    params:
+      cve_url: "https://ubuntu.com/security"
+      usn_rss: "https://ubuntu.com/security/notices/rss.xml"
+
+  - name: "ubuntu-22.04"
+    enabled: true
+    fetcher: "ubuntu"
+    params:
+      cve_url: "https://ubuntu.com/security"
+      usn_rss: "https://ubuntu.com/security/notices/rss.xml"
+
+  - name: "aliyun-2"
+    enabled: true
+    fetcher: "aliyun"
+    params:
+      rss_url: "https://mirrors.aliyun.com/alinux/cve/rss.xml"
+      xml_base: "https://mirrors.aliyun.com/alinux/cve"
+
+  - name: "oracle-uekr8"
+    enabled: true
+    fetcher: "oracle"
+    params:
+      errata_base: "https://linux.oracle.com/errata"
+      mailing_list: "https://oss.oracle.com/pipermail/el-errata"
+
+  - name: "debian-trixie"
+    enabled: true
+    fetcher: "debian"
+    params:
+      tracker_url: "https://security-tracker.debian.org/tracker"
+
+  - name: "azure-linux-3.0"
+    enabled: false
+    fetcher: "azure"
+    params:
+      repo_url: "https://packages.microsoft.com/azurelinux/3.0/prod/base/x86_64"
+      kernel_series: "6.6"
+
+  - name: "azure-linux-4.0"
+    enabled: false
+    fetcher: "azure"
+    params:
+      repo_url: "https://packages.microsoft.com/azurelinux/4.0/beta/base/x86_64"
+      kernel_series: "6.18"
