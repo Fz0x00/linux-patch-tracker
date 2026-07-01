@@ -339,7 +339,7 @@ def generate_dashboard_html(
                 "distro_name": r.distro_name,
                 "status": r.status.value,
                 "delay_days": r.delay_days,
-                "fix_date": r.fix_date.strftime("%Y-%m-%d") if r.fix_date else None,
+                "fix_date": r.distro_fix_date.strftime("%Y-%m-%d") if r.distro_fix_date else None,
                 "advisory_id": r.advisory_id or "",
                 "tl_cls": cls,
                 "dot_label": dot,
